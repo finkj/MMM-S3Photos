@@ -326,6 +326,7 @@ Module.register("MMM-S3Photos", {
         return wrapper;
     },
 
+
     displayPhoto: function(photo, wrapper) {
         console.log("Preparing to show photo:", photo.key);
         const hidden = new Image();
@@ -337,55 +338,64 @@ Module.register("MMM-S3Photos", {
             const photoBack = wrapper.querySelector('.photo-back');
             
             if (photoCurrent) {
-                if (this.imagesDisplayed === 0) {
-                    this.updateAttribution(photo, wrapper);
-                }
-
-                // Update both current and background images
-                photoCurrent.style.backgroundImage = `url(${hidden.src})`;
-                if (photoBack) {
-                    photoBack.style.backgroundImage = `url(${hidden.src})`;
-                }
-                
-                // For absolute mode, calculate dimensions based on aspect ratio
+                // Prevent rotation by ensuring dimensions are set before transition
                 if (this.config.displayStyle === "absolute") {
                     const aspectRatio = hidden.width / hidden.height;
                     const size = this.config.absoluteOptions.size;
-
+    
                     if (this.config.absoluteOptions.side === "horizontal") {
                         const calculatedHeight = Math.round(size / aspectRatio);
+                        // IMPORTANT: Set dimensions first
                         photoCurrent.style.width = `${size}px`;
                         photoCurrent.style.height = `${calculatedHeight}px`;
-                        photoCurrent.style.backgroundSize = "100% 100%";
                     } else {
                         const calculatedWidth = Math.round(size * aspectRatio);
                         photoCurrent.style.height = `${size}px`;
                         photoCurrent.style.width = `${calculatedWidth}px`;
-                        photoCurrent.style.backgroundSize = "100% 100%";
                     }
-                } else if (this.config.displayStyle === "wallpaper" || this.config.displayStyle === "fill") {
-                    photoCurrent.style.backgroundSize = "cover";
-                } else {
-                    photoCurrent.style.backgroundSize = "contain";
                 }
-
-                if (this.imagesDisplayed > 0) {
-                    // Not the first image - wait for transition
-                    photoCurrent.addEventListener('transitionend', () => {
-                        this.updateAttribution(photo, wrapper);
-                    }, { once: true });
+    
+                if (this.imagesDisplayed === 0) {
+                    this.updateAttribution(photo, wrapper);
                 }
-
-                this.imagesDisplayed++;
+    
+                // Apply the background images after dimensions are set
+                // Set back layer first
+                if (photoBack) {
+                    photoBack.style.backgroundImage = `url(${hidden.src})`;
+                }
+                
+                // Then set front layer
+                requestAnimationFrame(() => {
+                    photoCurrent.style.backgroundImage = `url(${hidden.src})`;
+                    
+                    // Set background sizing
+                    if (this.config.displayStyle === "absolute") {
+                        photoCurrent.style.backgroundSize = "100% 100%";
+                    } else if (this.config.displayStyle === "wallpaper" || this.config.displayStyle === "fill") {
+                        photoCurrent.style.backgroundSize = "cover";
+                    } else {
+                        photoCurrent.style.backgroundSize = "contain";
+                    }
+    
+                    if (this.imagesDisplayed > 0) {
+                        // Not the first image - wait for transition
+                        photoCurrent.addEventListener('transitionend', () => {
+                            this.updateAttribution(photo, wrapper);
+                        }, { once: true });
+                    }
+    
+                    this.imagesDisplayed++;
+                });
             }
-
+    
             // Schedule next photo
             if (this.timer) clearTimeout(this.timer);
             this.timer = setTimeout(() => {
                 this.updatePhoto();
             }, this.config.displayDurationSeconds * 1000);
         };
-
+    
         hidden.onerror = () => {
             console.error("Failed to load image:", photo.key);
             this.updatePhoto();
@@ -418,13 +428,15 @@ Module.register("MMM-S3Photos", {
         }
     },
 
+
+
     updatePhoto: function() {
         console.log("Updating photo");
         if (!this.photos || this.photos.length === 0) {
             console.log("No photos available to display");
             return;
         }
-
+    
         let nextIndex;
         switch (this.config.displayOrder) {
             case "random_dedupe":
@@ -433,7 +445,7 @@ Module.register("MMM-S3Photos", {
                     console.log("Initializing shown photos tracking");
                     this.shownPhotos = new Set();
                 }
-
+    
                 // Get array of available (unshown) indices
                 const availableIndices = Array.from(Array(this.photos.length).keys())
                     .filter(i => !this.shownPhotos.has(i));
@@ -467,11 +479,11 @@ Module.register("MMM-S3Photos", {
             default:
                 nextIndex = (this.currentIndex + 1) % this.photos.length;
         }
-
+    
         this.currentIndex = nextIndex;
         const nextPhoto = this.photos[nextIndex];
         console.log("Loading photo:", nextPhoto.key);
-
+    
         // Update DOM
         const moduleWrapper = document.getElementById(this.identifier);
         if (moduleWrapper) {
