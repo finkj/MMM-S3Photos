@@ -93,6 +93,57 @@
     background-repeat: no-repeat;
 }
 
+/* Video element styling */
+.video-current {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 1;
+    /* Hardware acceleration for smooth video playback */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+}
+
+/* Video sizing for different display modes */
+.MMM-S3Photos.wallpaper .video-current,
+.MMM-S3Photos.fill .video-current {
+    object-fit: cover;
+}
+
+.MMM-S3Photos.fit-display .video-current {
+    object-fit: contain;
+}
+
+/* Absolute mode video positioning */
+.MMM-S3Photos.absolute .video-current {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    z-index: 1;
+}
+
+/* Video in blur container */
+.blur-enabled .video-current {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1;
+}
+
 .photo-back {
     position: absolute;
     inset: 0;
@@ -100,7 +151,7 @@
     background-position: center;
     background-repeat: no-repeat;
     filter: blur(10px) brightness(40%);
-    transition:  transition: opacity var(--transition-duration, 2s) ease-in-out;
+    transition: opacity var(--transition-duration, 2s) ease-in-out,
                 width var(--transition-duration, 2s) ease-in-out,
                 height var(--transition-duration, 2s) ease-in-out;
     z-index: 0;

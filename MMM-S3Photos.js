@@ -20,6 +20,15 @@ Module.register("MMM-S3Photos", {
         },
         applyBlur: false, // Apply blur effect to empty space
         displayOrder: "random", // "newest_first", "oldest_first", "random", "random_dedupe"
+        video: {
+            enabled: true,           // Enable/disable video playback
+            autoplay: true,          // Auto-start videos
+            muted: true,             // Mute videos (required for autoplay)
+            loop: false,             // Loop individual videos
+            controls: false,         // Show video controls
+            preload: 'metadata',     // Preload strategy ('none', 'metadata', 'auto')
+            videosOnly: false        // Show only videos (filter out images)
+        },
         attribution: {
             enabled: true,
             attributions: {
@@ -49,6 +58,35 @@ Module.register("MMM-S3Photos", {
         if (wrapper) {
             wrapper.style.setProperty('--transition-duration', `${this.config.transitionDurationSeconds || 2}s`);
         }
+    },
+
+    getMediaType: function(key) {
+        const ext = key.toLowerCase().split('.').pop();
+        const videoExts = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv', 'm4v'];
+        const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+        
+        if (videoExts.includes(ext)) return 'video';
+        if (imageExts.includes(ext)) return 'image';
+        return 'unknown';
+    },
+
+    createMediaElements: function() {
+        // Create photo elements
+        const photoBack = document.createElement("div");
+        photoBack.className = "photo-back";
+        
+        const photoCurrent = document.createElement("div");
+        photoCurrent.className = "photo-current";
+        
+        // Create video element
+        const videoCurrent = document.createElement("video");
+        videoCurrent.className = "video-current";
+        videoCurrent.style.display = "none";
+        videoCurrent.preload = this.config.video.preload;
+        videoCurrent.muted = this.config.video.muted;
+        videoCurrent.controls = this.config.video.controls;
+        
+        return { photoBack, photoCurrent, videoCurrent };
     },
 
     notificationReceived: function(notification, payload, sender) {
@@ -125,7 +163,18 @@ Module.register("MMM-S3Photos", {
             case "PHOTOS_UPDATED":
                 if (Array.isArray(payload) && payload.length > 0) {
                     Log.info("Received photos array with length:", payload.length);
-                    this.photos = payload;
+                    
+                    // Filter to videos only if configured
+                    if (this.config.video.videosOnly) {
+                        this.photos = payload.filter(item => {
+                            const mediaType = this.getMediaType(item.key);
+                            return mediaType === 'video';
+                        });
+                        Log.info(`Filtered to ${this.photos.length} videos only`);
+                    } else {
+                        this.photos = payload;
+                    }
+                    
                     this.errorMessage = null;
                     this.loaded = true;
                     this.updateDom(0);
@@ -255,32 +304,22 @@ Module.register("MMM-S3Photos", {
                     });
                 }
                 
-                const photoBack = document.createElement("div");
-                photoBack.className = "photo-back";
-                
-                const photoCurrent = document.createElement("div");
-                photoCurrent.className = "photo-current";
+                const { photoBack, photoCurrent, videoCurrent } = this.createMediaElements();
                 
                 blurContainer.appendChild(photoBack);
                 blurContainer.appendChild(photoCurrent);
+                blurContainer.appendChild(videoCurrent);
                 wrapper.appendChild(blurContainer);
             } else {
-                const photoBack = document.createElement("div");
-                photoBack.className = "photo-back";
-                
-                const photoCurrent = document.createElement("div");
-                photoCurrent.className = "photo-current";
+                const { photoBack, photoCurrent, videoCurrent } = this.createMediaElements();
                 
                 wrapper.appendChild(photoBack);
                 wrapper.appendChild(photoCurrent);
+                wrapper.appendChild(videoCurrent);
             }
         } else {
-            // Create photo elements first
-            const photoBack = document.createElement("div");
-            photoBack.className = "photo-back";
-            
-            const photoCurrent = document.createElement("div");
-            photoCurrent.className = "photo-current";
+            // Create media elements
+            const { photoBack, photoCurrent, videoCurrent } = this.createMediaElements();
             
             // Handle absolute sizing
             if (this.config.absoluteOptions && this.config.absoluteOptions.enabled) {
@@ -312,18 +351,106 @@ Module.register("MMM-S3Photos", {
                     
                     blurContainer.appendChild(photoBack);
                     blurContainer.appendChild(photoCurrent);
+                    blurContainer.appendChild(videoCurrent);
                     wrapper.appendChild(blurContainer);
                 } else {
                     wrapper.appendChild(photoBack);
                     wrapper.appendChild(photoCurrent);
+                    wrapper.appendChild(videoCurrent);
                 }
             } else {
                 wrapper.appendChild(photoBack);
                 wrapper.appendChild(photoCurrent);
+                wrapper.appendChild(videoCurrent);
             }
         }
         
         return wrapper;
+    },
+
+    displayMedia: function(media, wrapper) {
+        const mediaType = this.getMediaType(media.key);
+        
+        if (mediaType === 'video' && this.config.video.enabled) {
+            this.displayVideo(media, wrapper);
+        } else {
+            this.displayPhoto(media, wrapper);
+        }
+    },
+
+    displayVideo: function(video, wrapper) {
+        console.log("Preparing to show video:", video.key);
+        const videoElement = wrapper.querySelector('.video-current');
+        const photoCurrent = wrapper.querySelector('.photo-current');
+        const photoBack = wrapper.querySelector('.photo-back');
+        
+        if (!videoElement) {
+            console.error("Video element not found in wrapper");
+            return;
+        }
+        
+        // Hide photo elements
+        if (photoCurrent) photoCurrent.style.display = 'none';
+        if (photoBack) photoBack.style.display = 'none';
+        
+        // Configure video element with performance optimizations
+        videoElement.src = this.file(`cache/${video.key}`);
+        videoElement.autoplay = this.config.video.autoplay;
+        videoElement.muted = this.config.video.muted;
+        videoElement.loop = this.config.video.loop;
+        videoElement.controls = this.config.video.controls;
+        
+        // Performance optimizations for smooth playback
+        videoElement.setAttribute('playsinline', '');
+        videoElement.setAttribute('webkit-playsinline', '');
+        
+        if (this.config.displayStyle === "absolute" && this.config.absoluteOptions?.enabled) {
+            const size = this.config.absoluteOptions.size || 400;
+            
+            if (this.config.absoluteOptions.side === "horizontal") {
+                videoElement.style.maxWidth = `${size}px`;
+                videoElement.style.height = 'auto';
+                videoElement.style.width = '100%';
+            } else {
+                videoElement.style.maxHeight = `${size}px`;
+                videoElement.style.width = 'auto';
+                videoElement.style.height = '100%';
+            }
+        } else {
+            videoElement.style.width = '100%';
+            videoElement.style.height = '100%';
+            videoElement.style.objectFit = this.config.displayStyle === "wallpaper" || this.config.displayStyle === "fill" ? 'cover' : 'contain';
+        }
+        
+        const newVideoElement = videoElement.cloneNode(true);
+        videoElement.parentNode.replaceChild(newVideoElement, videoElement);
+        
+        newVideoElement.addEventListener('loadeddata', () => {
+            console.log("Video loaded successfully:", video.key);
+            newVideoElement.style.display = 'block';
+            
+            this.updateAttribution(video, wrapper);
+            
+            // If video is shorter than display duration and not looping, 
+            // schedule next media when video ends
+            if (!this.config.video.loop) {
+                newVideoElement.addEventListener('ended', () => {
+                    console.log("Video ended, advancing to next media");
+                    this.updateMedia();
+                }, { once: true });
+            }
+        });
+        
+        newVideoElement.addEventListener('error', (e) => {
+            console.error("Video failed to load:", video.key, e);
+            this.updateMedia();
+        });
+        
+        // Set up timer for next media (in case video is longer than display duration or loops)
+        if (this.timer) clearTimeout(this.timer);
+        this.timer = setTimeout(() => {
+            this.updateMedia();
+        }, this.config.displayDurationSeconds * 1000);
     },
 
 
@@ -333,9 +460,18 @@ Module.register("MMM-S3Photos", {
         hidden.src = this.file(`cache/${photo.key}`);
         console.log("Full image URL:", hidden.src);
         
+        const videoElement = wrapper.querySelector('.video-current');
+        if (videoElement) {
+            videoElement.style.display = 'none';
+            videoElement.pause();
+        }
+        
         hidden.onload = () => {
             const photoCurrent = wrapper.querySelector('.photo-current');
             const photoBack = wrapper.querySelector('.photo-back');
+            
+            if (photoCurrent) photoCurrent.style.display = 'block';
+            if (photoBack) photoBack.style.display = 'block';
             
             if (photoCurrent) {
                 // Prevent rotation by ensuring dimensions are set before transition
@@ -353,10 +489,6 @@ Module.register("MMM-S3Photos", {
                         photoCurrent.style.height = `${size}px`;
                         photoCurrent.style.width = `${calculatedWidth}px`;
                     }
-                }
-    
-                if (this.imagesDisplayed === 0) {
-                    this.updateAttribution(photo, wrapper);
                 }
     
                 // Apply the background images after dimensions are set
@@ -378,27 +510,23 @@ Module.register("MMM-S3Photos", {
                         photoCurrent.style.backgroundSize = "contain";
                     }
     
-                    if (this.imagesDisplayed > 0) {
-                        // Not the first image - wait for transition
-                        photoCurrent.addEventListener('transitionend', () => {
-                            this.updateAttribution(photo, wrapper);
-                        }, { once: true });
-                    }
+                    // Update attribution immediately for all images
+                    this.updateAttribution(photo, wrapper);
     
                     this.imagesDisplayed++;
                 });
             }
     
-            // Schedule next photo
+            // Schedule next media
             if (this.timer) clearTimeout(this.timer);
             this.timer = setTimeout(() => {
-                this.updatePhoto();
+                this.updateMedia();
             }, this.config.displayDurationSeconds * 1000);
         };
     
         hidden.onerror = () => {
             console.error("Failed to load image:", photo.key);
-            this.updatePhoto();
+            this.updateMedia();
         };
     },
 
@@ -413,27 +541,27 @@ Module.register("MMM-S3Photos", {
     },
 
     scheduleNextPhoto: function() {
-        Log.info("Scheduling next photo");
+        Log.info("Scheduling next media");
         if (this.timer) {
             clearTimeout(this.timer);
         }
         
         this.timer = setTimeout(() => {
-            this.updatePhoto();
+            this.updateMedia();
         }, this.config.displayDurationSeconds * 1000);
         
-        // Show first photo immediately
+        // Show first media immediately
         if (!this.currentPhoto) {
-            this.updatePhoto();
+            this.updateMedia();
         }
     },
 
 
 
-    updatePhoto: function() {
-        console.log("Updating photo");
+    updateMedia: function() {
+        console.log("Updating media");
         if (!this.photos || this.photos.length === 0) {
-            console.log("No photos available to display");
+            console.log("No media available to display");
             return;
         }
     
@@ -442,7 +570,7 @@ Module.register("MMM-S3Photos", {
             case "random_dedupe":
                 // Initialize tracking Set if it doesn't exist
                 if (!this.shownPhotos) {
-                    console.log("Initializing shown photos tracking");
+                    console.log("Initializing shown media tracking");
                     this.shownPhotos = new Set();
                 }
     
@@ -450,21 +578,21 @@ Module.register("MMM-S3Photos", {
                 const availableIndices = Array.from(Array(this.photos.length).keys())
                     .filter(i => !this.shownPhotos.has(i));
                 
-                console.log("Available photos:", availableIndices.length, "Total photos:", this.photos.length);
+                console.log("Available media:", availableIndices.length, "Total media:", this.photos.length);
                 
-                // If no photos are available, reset tracking
+                // If no media are available, reset tracking
                 if (availableIndices.length === 0) {
-                    console.log("All photos shown, resetting tracking");
+                    console.log("All media shown, resetting tracking");
                     this.shownPhotos.clear();
                     // Recalculate available indices
                     nextIndex = Math.floor(Math.random() * this.photos.length);
                 } else {
-                    // Pick random photo from available indices
+                    // Pick random media from available indices
                     const randomAvailable = Math.floor(Math.random() * availableIndices.length);
                     nextIndex = availableIndices[randomAvailable];
                 }
                 
-                console.log("Selected new photo index:", nextIndex);
+                console.log("Selected new media index:", nextIndex);
                 this.shownPhotos.add(nextIndex);
                 break;
             case "random":
@@ -481,13 +609,13 @@ Module.register("MMM-S3Photos", {
         }
     
         this.currentIndex = nextIndex;
-        const nextPhoto = this.photos[nextIndex];
-        console.log("Loading photo:", nextPhoto.key);
+        const nextMedia = this.photos[nextIndex];
+        console.log("Loading media:", nextMedia.key);
     
         // Update DOM
         const moduleWrapper = document.getElementById(this.identifier);
         if (moduleWrapper) {
-            this.displayPhoto(nextPhoto, moduleWrapper);
+            this.displayMedia(nextMedia, moduleWrapper);
         }
     },
 
