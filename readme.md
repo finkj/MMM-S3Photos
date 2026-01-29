@@ -1,8 +1,8 @@
 # MMM-S3Photos
 
-A MagicMirror² module that displays photos from an AWS S3 bucket with various display options and automatic synchronization.
+A MagicMirror² module that displays photos and videos from an AWS S3 bucket with various display options and automatic synchronization.
 
-This module was created as a result of Google Photos crippling their API and limiting how you can access your own data. While AWS is not free like Google Photos, it does provide a more open and flexible platform for storing and accessing your photos. And if configured properly, can be very inexpensive to run. My set up has a monthly cost of ~$0.60 thats not a typo 60 CENTS! if you are on the free tier it will be even cheaper. see cost breakdown for more details.
+This module was created as a result of Google Photos crippling their API and limiting how you can access your own data. While AWS is not free like Google Photos, it does provide a more open and flexible platform for storing and accessing your photos and videos. And if configured properly, can be very inexpensive to run. My set up has a monthly cost of ~$0.60 thats not a typo 60 CENTS! if you are on the free tier it will be even cheaper. see cost breakdown for more details.
 
 This is under active development so some minor quirks should be expected. will do my best to fix them as they are reported.
 See the docs folder for more details on configuration options and other details.
@@ -21,6 +21,11 @@ I'm a overworked, and underpaid, tech worker in the analytics and intelligence i
 ## Features
 - **Automated AWS Infrastructure Setup**
   - Script handles creating S3 bucket, Lambda function, and related invocation roles.
+- **Video and Photo Support**
+  - Supports common video formats: MP4, WebM, OGG, MOV, AVI, MKV, M4V
+  - Supports image formats: JPG, JPEG, PNG, GIF, WebP, BMP, SVG
+  - Configurable video options (autoplay, loop, mute, controls)
+  - Optional videos-only mode for testing or dedicated video displays
 - **Configurable display duration**
    - Minimum 10 seconds recommended
 - **Multiple display styles:**
@@ -30,30 +35,30 @@ I'm a overworked, and underpaid, tech worker in the analytics and intelligence i
 - **Optional blur effect for empty space**
 - **Multiple display order options:**
   - Random 
-  - Random with deduplication <- displays all photos once before repeating
+  - Random with deduplication <- displays all media once before repeating
   - Newest first
   - Oldest first
 - **Optional attribution overlay with configurable positioning**
   - Static (fixed position)
   - Dynamic (random position)
-- **Photo upload from USB storage device**
+- **Photo/Video upload from USB storage device**
    - Script based uploads to S3 bucket, maintains folder structure.
    - Safely ejects USB device
 - **Optional selfieshot uploads from MMM-Selfieshot**
    - Uploads selfies taken from the MMM-Selfieshot module to S3 bucket.
 - **Delta Updates**: 
-   - Only downloads new or modified photos, reducing bandwidth usage
+   - Only downloads new or modified media, reducing bandwidth usage
 - **Configurable Cache Lifetime**: 
    - Set `cacheLifeDays: 0` for permanent cache
    - Set `cacheLifeDays: N` to automatically purge cache every N days < -- NOT RECOMMENDED!! (due to increase data transfer cost.)
 
 ## Uploading files to S3
- There are a couple options for uploading files to S3. (and by extenstion to your MagicMirror²)
- - 1. Included in this modules is a utility script to copy files to the cache folder and upload them to the S3 bucket. See [USB Upload Instructions](docs/usb_uploads.md) for more details.
+ There are a couple options for uploading files to S3. (and by extension to your MagicMirror²)
+ - 1. Included in this module is a utility script to copy files to the cache folder and upload them to the S3 bucket. See [USB Upload Instructions](docs/usb_uploads.md) for more details.
  - 2. Manually upload files to the S3 bucket using the AWS console (Website UI).
- - 3. Use the AWS CLI to upload files to the S3 bucket. The user and access keys that are created as part of the setup script have the necessary permissions to directly upload files to the S3 bucket. You can pair this something like onedrive or dropbox and a simple cronjob to automatically sync your photos to the S3 bucket.
- - 4. If you are looking for a more hands off app like experiance, there are a number of 3rd party apps that allow you to sync photos to an S3 bucket. I dont spesifically endorse these but they seem to be popular:  [immich](https://immich.app/) , [photosync](https://www.photosync-app.com/home)
- - 5. if you are up for more of a techincal approach you can set up a SNS topic and Amazon SES and simply email photos as attachments to your s3 bucket. 
+ - 3. Use the AWS CLI to upload files to the S3 bucket. The user and access keys that are created as part of the setup script have the necessary permissions to directly upload files to the S3 bucket. You can pair this something like onedrive or dropbox and a simple cronjob to automatically sync your photos and videos to the S3 bucket.
+ - 4. If you are looking for a more hands off app like experience, there are a number of 3rd party apps that allow you to sync photos to an S3 bucket. I dont specifically endorse these but they seem to be popular:  [immich](https://immich.app/) , [photosync](https://www.photosync-app.com/home)
+ - 5. if you are up for more of a technical approach you can set up a SNS topic and Amazon SES and simply email photos/videos as attachments to your s3 bucket. 
 
 # AWS Costs
 This module uses AWS services that may incur charges.
@@ -93,7 +98,7 @@ Example details:
 
 
 ## To Do / Wish List / On the Back Burner
-* Video? Pi3B is limited to 720p due to resources and 4+ would around 1080p not sure if its worth supporting video
+* ~~Video support~~ ✅ **COMPLETED** - Now supports Videos with hardware-accelerated playback. Tested on Raspberry Pi 5
 
 # Installation instructions
  * ssh into raspberry pi
@@ -152,6 +157,12 @@ Add this to your ~/MagicMirror/css/custom.css file:
    - Check network connectivity
    - Verify S3 bucket permissions
    - Review module logs in MagicMirror console
+
+**Video Playback Issues**
+   - Ensure video files are in supported formats (MP4, WebM, OGG recommended)
+   - Check that videos are not too large (hardware limitations on Raspberry Pi)
+   - For stuttering videos, try reducing video resolution or bitrate
+   - Enable hardware acceleration in Chromium: `--enable-features=VaapiVideoDecoder`
 
 
 
